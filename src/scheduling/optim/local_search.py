@@ -1,82 +1,164 @@
 '''
-Heuristics that compute an initial solution and 
-then improve it.
+Heuristiques de recherche locale.
+
+Deux algorithmes sont implémentés :
+- FirstNeighborLocalSearch : un seul voisinage, s'arrête sur la première solution améliorante.
+- BestNeighborLocalSearch  : deux voisinages, retient la meilleure solution à chaque étape.
+
+La solution initiale est construite par NonDeterminist (GRASP).
 
 @author: Vassilissa Lehoux
 '''
-from typing import Dict
+from typing import Dict, List, Type
 
 from src.scheduling.optim.heuristics import Heuristic
 from src.scheduling.instance.instance import Instance
 from src.scheduling.solution import Solution
 from src.scheduling.optim.constructive import NonDeterminist
-from src.scheduling.optim.neighborhoods import MyNeighborhood1
+from src.scheduling.optim.neighborhoods import (
+    Neighborhood, SwapOnMachine, MachineReassign,
+    _reconstruct, _extract_orderings
+)
 
 
 class FirstNeighborLocalSearch(Heuristic):
     '''
-    Vanilla local search will first create a solution,
-    then at each step try and improve it by looking at
-    solutions in its neighborhood.
-    The first solution found that improves over the current solution
-    replaces it.
-    The algorithm stops when no solution is better than the current solution
-    in its neighborhood.
+    Recherche locale "première amélioration" avec un seul voisinage.
+
+    Algorithme :
+      1. Construire une solution initiale avec NonDeterminist.
+      2. Explorer le voisinage ; prendre la première solution améliorante.
+      3. Répéter jusqu'à obtenir un optimum local (aucun voisin ne l'améliore).
+
+    Le voisinage par défaut est SwapOnMachine (N1).
     '''
 
-    def __init__(self, params: Dict=dict()):
+    def __init__(self, params: Dict = dict()):
         '''
-        Constructor
-        @param params: The parameters of your heuristic method if any as a
-               dictionary. Implementation should provide default values in the function.
+        @param params: dictionnaire optionnel avec les clés :
+            - "w_energy", "w_time" : transmis à la construction initiale
         '''
-        raise "Not implemented error"
+        super().__init__(params)
 
-    def run(self, instance: Instance, InitClass, NeighborClass, params: Dict=dict()) -> Solution:
+    def run(self, instance: Instance,
+            InitClass: Type = None,
+            NeighborClass: Type = None,
+            params: Dict = dict()) -> Solution:
         '''
-        Compute a solution for the given instance.
-        Implementation should provide default values in the function
-        (the function will be evaluated with an empty dictionary).
+        Calcule une solution par recherche locale avec première amélioration.
+        @param instance: instance à résoudre
+        @param InitClass: classe de l'heuristique de construction initiale
+                          (défaut : NonDeterminist)
+        @param NeighborClass: classe du voisinage à utiliser
+                              (défaut : SwapOnMachine)
+        @param params: paramètres supplémentaires
+        @return: Solution (optimum local)
+        '''
+        merged = {**self._params, **params}
 
-        @param instance: the instance to solve
-        @param InitClass: the class for the heuristic computing the initialization
-        @param NeighborClass: the class of neighborhood used in the vanilla local search
-        @param params: the parameters for the run
-        '''
-        raise "Not implemented error"
+        if InitClass is None:
+            InitClass = NonDeterminist
+        if NeighborClass is None:
+            NeighborClass = SwapOnMachine
+
+        # Construction de la solution initiale
+        current_sol = InitClass().run(instance, merged)
+        neighborhood = NeighborClass(instance, merged)
+
+        # Amélioration itérative : première solution améliorante
+        while True:
+            current_obj = current_sol.objective     # Valeur avant exploration
+            next_sol = neighborhood.first_better_neighbor(current_sol)
+            if next_sol.objective < current_obj:
+                current_sol = next_sol
+            else:
+                break   # optimum local atteint
+
+        return current_sol
 
 
 class BestNeighborLocalSearch(Heuristic):
     '''
-    Vanilla local search will first create a solution,
-    then at each step try and improve it by looking at
-    solutions in its neighborhood.
-    The best solution found that improves over the current solution
-    replaces it.
-    The algorithm stops when no solution is better than the current solution
-    in its neighborhood.
+    Recherche locale "meilleure amélioration" avec deux voisinages.
+
+    Algorithme :
+      1. Construire une solution initiale avec NonDeterminist.
+      2. Explorer les deux voisinages ; retenir la meilleure solution trouvée.
+      3. Si une amélioration est trouvée, recommencer depuis cette solution.
+      4. S'arrêter si aucun voisinage n'améliore OU si max_iterations est atteint.
+
+    Les voisinages par défaut sont SwapOnMachine (N1) et MachineReassign (N2).
     '''
 
-    def __init__(self, params: Dict=dict()):
+    def __init__(self, params: Dict = dict()):
         '''
-        Constructor
-        @param params: The parameters of your heuristic method if any as a
-               dictionary. Implementation should provide default values in the function.
+        @param params: dictionnaire optionnel avec les clés :
+            - "max_iterations" (int, défaut 100) : nombre maximal d'itérations
+            - "w_energy", "w_time" : transmis à la construction initiale
         '''
-        raise "Not implemented error"
+        super().__init__(params)
 
-    def run(self, instance: Instance, InitClass, NeighborClass, params: Dict=dict()) -> Solution:
+    def run(self, instance: Instance,
+            InitClass: Type = None,
+            NeighborClasses=None,
+            params: Dict = dict()) -> Solution:
         '''
-        Computes a solution for the given instance.
-        Implementation should provide default values in the function
-        (the function will be evaluated with an empty dictionary).
+        Calcule une solution par recherche locale avec meilleure amélioration.
+        @param instance: instance à résoudre
+        @param InitClass: classe de l'heuristique de construction initiale
+                          (défaut : NonDeterminist)
+        @param NeighborClasses: liste/tuple de classes de voisinage
+                                (défaut : [SwapOnMachine, MachineReassign])
+        @param params: paramètres supplémentaires (max_iterations, ...)
+        @return: Solution (optimum local ou limite d'itérations atteinte)
+        '''
+        merged = {**self._params, **params}
+        max_iter = int(merged.get('max_iterations', 100))
 
-        @param instance: the instance to solve
-        @param InitClass: the class for the heuristic computing the initialization
-        @param NeighborClass: the class of neighborhood used in the vanilla local search
-        @param params: the parameters for the run
-        '''
-        raise "Not implemented error"
+        if InitClass is None:
+            InitClass = NonDeterminist
+        if NeighborClasses is None:
+            NeighborClasses = [SwapOnMachine, MachineReassign]
+        # Accepter une seule classe passée directement (pas dans une liste)
+        if not isinstance(NeighborClasses, (list, tuple)):
+            NeighborClasses = [NeighborClasses]
+
+        # Construction de la solution initiale
+        current_sol = InitClass().run(instance, merged)
+        neighborhoods: List[Neighborhood] = [NC(instance, merged) for NC in NeighborClasses]
+
+        for _ in range(max_iter):
+            # Valeur objectif courante (mise en cache avant tout changement)
+            current_obj = current_sol.objective
+
+            # Snapshot de l'état courant pour pouvoir restaurer entre voisinages
+            current_snap = _extract_orderings(instance)
+
+            best_snap = None
+            best_obj = current_obj
+
+            for neighborhood in neighborhoods:
+                # Restaurer l'état courant avant d'explorer ce voisinage
+                # (chaque neighborhood.best_neighbor change l'état de l'instance)
+                _reconstruct(instance, {m_id: list(ops)
+                                        for m_id, ops in current_snap.items()})
+
+                candidate = neighborhood.best_neighbor(current_sol)
+                c_obj = candidate.objective
+                if c_obj < best_obj:
+                    best_obj = c_obj
+                    # Capturer le snapshot du meilleur candidat
+                    best_snap = _extract_orderings(instance)
+
+            if best_snap is None:
+                # Aucun voisinage n'a amélioré : optimum local
+                _reconstruct(instance, current_snap)   # Restaurer l'état courant
+                break
+
+            # Reconstruire depuis le meilleur snapshot
+            current_sol = _reconstruct(instance, best_snap)
+
+        return current_sol
 
 
 if __name__ == "__main__":
