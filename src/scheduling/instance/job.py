@@ -1,82 +1,101 @@
 '''
-Job. It is composed of several operations.
+Job composé de plusieurs opérations à effectuer dans l'ordre.
 
 @author: Vassilissa Lehoux
 '''
-from typing import List
+from typing import List, Optional
 
 from src.scheduling.instance.operation import Operation
 
 
 class Job(object):
     '''
-    Job class.
-    Contains information on the next operation to schedule for that job
+    Représente un job (tâche) composé d'une suite d'opérations ordonnées.
+    Les opérations doivent être exécutées dans l'ordre : l'opération i+1
+    ne peut commencer qu'une fois l'opération i terminée.
     '''
 
     def __init__(self, job_id: int):
         '''
-        Constructor
+        Constructeur.
+        @param job_id: identifiant unique du job
         '''
-        raise "Not implemented error"
-        
+        self._job_id = job_id
+        # Liste ordonnée des opérations du job
+        self._operations: List[Operation] = []
+        # Index de la prochaine opération à planifier
+        self._next_op_index: int = 0
+
     @property
     def job_id(self) -> int:
         '''
-        Returns the id of the job.
+        Retourne l'identifiant du job.
         '''
-        raise "Not implemented error"
+        return self._job_id
 
     def reset(self):
         '''
-        Resets the planned operations
+        Réinitialise l'index de planification (ne remet pas les opérations à zéro,
+        cela est fait par Solution.reset via Operation.reset).
         '''
-        raise "Not implemented error"
+        self._next_op_index = 0
 
     @property
     def operations(self) -> List[Operation]:
         '''
-        Returns a list of operations for the job
+        Retourne la liste ordonnée des opérations du job.
         '''
-        raise "Not implemented error"
+        return self._operations
 
     @property
-    def next_operation(self) -> Operation:
+    def next_operation(self) -> Optional[Operation]:
         '''
-        Returns the next operation to be scheduled
+        Retourne la prochaine opération à planifier,
+        ou None si toutes les opérations sont planifiées.
         '''
-        raise "Not implemented error"
+        if self._next_op_index < len(self._operations):
+            return self._operations[self._next_op_index]
+        return None
 
     def schedule_operation(self):
         '''
-        Updates the next_operation to schedule
+        Avance l'index de la prochaine opération à planifier.
+        À appeler après avoir planifié next_operation.
         '''
-        raise "Not implemented error"
+        self._next_op_index += 1
 
     @property
-    def planned(self):
+    def planned(self) -> bool:
         '''
-        Returns true if all operations are planned
+        Retourne True si toutes les opérations du job sont planifiées.
         '''
-        raise "Not implemented error"
+        return self._next_op_index >= len(self._operations)
 
     @property
     def operation_nb(self) -> int:
         '''
-        Returns the nb of operations of the job
+        Retourne le nombre d'opérations du job.
         '''
-        raise "Not implemented error"
+        return len(self._operations)
 
     def add_operation(self, operation: Operation):
         '''
-        Adds an operation to the job at the end of the operation list,
-        adds the precedence constraints between job operations.
+        Ajoute une opération à la fin de la liste du job.
+        Ajoute automatiquement la contrainte de précédence avec l'opération précédente.
         '''
-        raise "Not implemented error"
+        if self._operations:
+            # L'opération précédente doit être terminée avant la nouvelle
+            prev_op = self._operations[-1]
+            prev_op.add_successor(operation)
+            operation.add_predecessor(prev_op)
+        self._operations.append(operation)
 
     @property
     def completion_time(self) -> int:
         '''
-        Returns the job's completion time
+        Retourne l'heure de fin du job (heure de fin de la dernière opération).
+        Retourne -1 si le job n'est pas entièrement planifié.
         '''
-        raise "Not implemented error"
+        if self._operations and self._operations[-1].assigned:
+            return self._operations[-1].end_time
+        return -1
