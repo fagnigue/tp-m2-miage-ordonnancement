@@ -122,7 +122,40 @@ La machine doit d'abord effectuer son démarrage (10 minutes), puis exécuter le
 
 ## Premières heuristiques
 
-*À compléter.*
+### Heuristique gloutonne déterministe (`Greedy`)
+
+L'algorithme `Greedy` construit une solution en planifiant les opérations une par une. À chaque étape, il évalue toutes les paires (opération disponible, machine compatible) et choisit **irrémédiablement** celle dont le score local est minimal.
+
+Le score d'une paire est une somme pondérée :
+- l'énergie de traitement de l'opération sur la machine,
+- le temps de complétion estimé (temps de début estimé + durée de traitement).
+
+Le temps de début estimé tient compte de l'état de la machine : si elle n'est pas encore démarrée, on ajoute son temps de mise en route ; si elle est déjà active, on attend sa disponibilité.
+
+**Pourquoi cet algorithme est-il glouton ?**  
+Il prend des décisions localement optimales sans aucun retour arrière : une fois une opération planifiée sur une machine, ce choix n'est plus remis en question même s'il s'avère sous-optimal à plus long terme. L'heuristique ignore tout effet de bord futur (propagation des précédences, charge globale des machines).
+
+**Complexité** : O(O² × M) — à chacune des O étapes, on évalue les O × M paires disponibles.
+
+Les poids `w_energy` et `w_time` sont paramétrables (valeur par défaut : 1,0 chacun).
+
+---
+
+### Heuristique non-déterministe (`NonDeterminist`)
+
+L'algorithme `NonDeterminist` est inspiré de **GRASP** (*Greedy Randomized Adaptive Search Procedure*, Feo & Resende, 1995).
+
+À la différence du glouton pur, il ne sélectionne pas systématiquement le meilleur candidat : il construit à chaque étape une **liste restreinte de candidats** (RCL) composée des k meilleures paires (opération, machine), puis en choisit une **au hasard**.
+
+Ce mécanisme introduit de la diversité : deux appels successifs sur la même instance produisent généralement des solutions différentes. On peut fixer une graine aléatoire (`seed`) pour obtenir des résultats reproductibles.
+
+**Intérêt** : en lançant plusieurs fois l'heuristique, on explore davantage l'espace des solutions et on peut conserver la meilleure solution obtenue. C'est la base de la méthode GRASP complète, qui ajoute une phase de recherche locale après chaque construction.
+
+**Paramètres** : `w_energy` (défaut 1,0), `w_time` (défaut 1,0), `k` (taille de la RCL, défaut 3), `seed` (graine aléatoire, défaut `None`).
+
+**Complexité** : O(O² × M × log(O × M)) — identique au glouton à un tri supplémentaire près pour construire la RCL.
+
+**Référence** : Feo, T.A. & Resende, M.G.C. (1995). Greedy Randomized Adaptive Search Procedures. *Journal of Global Optimization*, 6(2), 109–133.
 
 ---
 
