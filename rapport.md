@@ -10,33 +10,38 @@
 
 Le problème demande de décider trois choses pour chaque solution :
 
-- **L'affectation de chaque opération à une machine** : pour chaque opération, on choisit sur quelle machine compatible elle sera exécutée. La durée de traitement et la consommation d'énergie de l'opération découlent de ce choix.
 
-- **L'heure de début de chaque opération** : une fois la machine choisie, on détermine à quel moment l'opération commence sur cette machine.
+- x[o, m] = 1 si l’opération o est choisie pour la machine m, sinon 0. Pour chaque opération, on choisit sur quelle machine compatible elle sera exécutée. 
 
-- **Les heures de démarrage et d'arrêt de chaque machine** : une machine doit être démarrée (phase de set_up) avant d'accueillir des opérations et doit être arrêtée (phase de tear_down) en fin de planning. Elle peut être allumée et éteinte plusieurs fois si cela permet d'économiser de l'énergie.
+
+- S[o] = heure de début de l’opération o. Une fois la machine choisie, on détermine à quel moment l'opération commence sur cette machine.
+
+- S[m,t] = état marche/arrêt de la machine m à l’instant t. 
+La machine peut être allumée et éteinte plusieurs fois à des nstants t.
 
 #### Contraintes
 
-**Contrainte d'affectation unique** : chaque opération est exécutée sur exactement une machine parmi celles qui lui sont compatibles. On ne peut pas répartir une opération sur plusieurs machines.
+- chaque opération est exécutée sur exactement une machine. On ne peut pas répartir une opération sur plusieurs machines.
 
-**Contrainte de précédence intra-job** : au sein d'un même job, les opérations doivent s'exécuter dans leur ordre défini. L'opération numéro i ne peut démarrer qu'une fois l'opération numéro i-1 entièrement terminée.
+- Toutes les tâches doivent être exécutées
 
-**Contrainte de non-chevauchement** : une machine ne peut exécuter qu'une seule opération à la fois. Deux opérations planifiées sur la même machine ne peuvent donc pas se chevaucher dans le temps.
+- au sein d'un même job, les opérations doivent s'exécuter dans leur ordre défini. L'opération numéro i ne peut démarrer qu'une fois l'opération numéro i-1 entièrement terminée.
 
-**Contrainte de disponibilité après démarrage** : une opération ne peut pas commencer sur une machine avant que le démarrage (set_up) de celle-ci soit terminé. Si la machine commence son set_up à l'instant t, la première opération ne peut démarrer qu'à t + set_up_time.
+- une machine ne peut exécuter qu'une seule opération à la fois. Deux opérations planifiées sur la même machine ne peuvent donc pas se chevaucher dans le temps.
 
-**Contrainte de fin de planning** : chaque machine doit avoir terminé toutes ses opérations avant son heure limite end_time. La machine doit pouvoir être arrêtée dans cette fenêtre temporelle.
+- une opération ne peut pas commencer sur une machine avant que le démarrage (set_up) de celle-ci soit terminé. 
+
+- chaque machine doit avoir terminé toutes ses opérations avant son heure limite end_time. La machine doit pouvoir être arrêtée avant son end_time
 
 #### Objectifs
 
-L'entreprise a plusieurs objectifs partiellement contradictoires :
+Nous avons déduit trois objectifs d'optimisation :
 
-- **Minimiser la consommation totale d'énergie** : énergie des opérations, énergie de démarrage et d'arrêt des machines, et énergie consommée à vide (machine allumée mais inactive).
-- **Minimiser le makespan** : réduire la durée totale du planning, c'est-à-dire l'heure à laquelle le dernier job est terminé.
-- **Minimiser le temps de complétion moyen** : réduire la durée moyenne nécessaire pour terminer chaque job, ce qui traduit une bonne réactivité de l'atelier.
+- construire un planning qui minimise la consommation énergétique totale de l’usine. Cette consommation comprend l’énergie nécessaire à l’exécution des opérations, l’énergie liée aux phases de démarrage et d’arrêt des machines, ainsi que l’énergie consommée lorsque les machines restent allumées sans produire.
+ 
+- Limiter la durée totale du planning, 
 
-Ces objectifs sont en tension : choisir la machine la plus rapide consomme souvent plus d'énergie, et maintenir plusieurs machines allumées réduit les temps d'attente mais augmente la consommation à vide.
+- Réduire la durée moyenne de complétion des jobs et les retards éventuels, car la rapidité d’exécution reste un critère important.
 
 ---
 
@@ -44,29 +49,21 @@ Ces objectifs sont en tension : choisir la machine la plus rapide consomme souve
 
 Pour obtenir un critère unique à minimiser, on combine les trois objectifs par une somme pondérée :
 
-**Score = w_E × énergie totale + w_T × makespan + w_M × somme des temps de complétion**
+**Score = w_E × énergie totale + w_T × date de fin de la dernière opération planifiée (makespan) + w_M × somme des temps de complétion**
 
-- **w_E** pilote l'importance de l'économie d'énergie.
-- **w_T** pilote l'importance de finir le planning rapidement.
-- **w_M** pilote l'importance de la réactivité job par job.
+- **w_E** poids de l'économie d'énergie.
+- **w_T** l'importance de finir les jobs rapidement (date à laquelle la dernière opération du planning est achevée).
+- **w_M** l'importance de la réactivité job par job.
 
-En jouant sur ces poids, l'entreprise peut exprimer ses priorités. Des poids égaux donnent une solution de compromis équilibrée. Il est recommandé de normaliser chaque composante (diviser par un ordre de grandeur typique) pour éviter qu'un terme domine les autres par son échelle.
+En jouant sur ces poids, l'entreprise peut exprimer ses priorités. Des poids égaux donnent une solution de compromis équilibrée. 
 
-**Décomposition de l'énergie totale** :
-
-- *Énergie des opérations* : somme des consommations de chaque opération sur la machine choisie (données directement dans le fichier CSV).
-- *Énergie de démarrage et d'arrêt* : pour chaque cycle allumé/éteint d'une machine, on ajoute set_up_energy et tear_down_energy.
-- *Énergie à vide* : pendant les périodes où une machine est allumée mais n'exécute aucune opération (ni set_up ni traitement), elle consomme sa puissance minimale min_consumption (en kW) multipliée par la durée d'inactivité (convertie en heures).
-
----
 
 ### 3. Évaluation d'une solution
 
 #### Solution réalisable
 
-Une solution est **réalisable** si toutes les contraintes listées ci-dessus sont respectées : chaque opération est assignée à une machine compatible, les précédences sont respectées, aucune machine n'est surchargée à un instant donné, et toutes les opérations terminent avant la limite end_time de leur machine.
 
-Pour évaluer une telle solution, on calcule dans l'ordre :
+Pour évaluer une solution réalisable, on calcule dans l'ordre :
 
 1. L'heure de fin de chaque opération (heure de début + durée de traitement sur la machine choisie).
 2. Le makespan : heure de fin maximale parmi tous les jobs.
@@ -78,29 +75,11 @@ Pour évaluer une telle solution, on calcule dans l'ordre :
 
 Une solution **non réalisable** viole au moins une contrainte. Plutôt que de la rejeter, on peut lui attribuer une valeur pénalisée afin de pouvoir la comparer à d'autres solutions non réalisables et guider l'algorithme vers la faisabilité.
 
-La valeur pénalisée est : **Score_pénalisé = Score + κ × Pénalité**
-
-où κ est un grand coefficient et la pénalité mesure l'ampleur des violations :
-
-- **Violations de précédence** : durée totale pendant laquelle une opération commence avant que son prédécesseur soit terminé.
-- **Chevauchements sur machine** : durée totale de chevauchement entre opérations sur la même machine.
-- **Dépassement de end_time** : durée totale pendant laquelle des opérations dépassent la limite temporelle de leur machine.
-- **Affectations invalides** : nombre d'opérations assignées à une machine incompatible.
-
-En choisissant κ suffisamment grand, les solutions infaisables obtiennent toujours un score plus élevé que les solutions réalisables, ce qui garantit que l'algorithme préfère toujours une solution faisable à une infaisable.
-
 ---
 
 ### 4. Instance sans solution réalisable
 
-**Description de l'instance :**
-
-- Une seule machine m0 avec : set_up_time = 10 minutes, tear_down_time = 5 minutes, end_time = 30 minutes.
-- Un seul job composé de deux opérations séquentielles, chacune ne pouvant s'exécuter que sur m0 avec une durée de 15 minutes.
-
-**Pourquoi aucune solution n'est réalisable :**
-
-La machine doit d'abord effectuer son démarrage (10 minutes), puis exécuter les deux opérations dans l'ordre (15 + 15 = 30 minutes), puis effectuer son arrêt (5 minutes). La durée minimale nécessaire est donc 10 + 15 + 15 + 5 = 45 minutes. Or end_time = 30 minutes : il est physiquement impossible de faire rentrer l'intégralité du planning dans la fenêtre autorisée. Aucun ordonnancement ne peut satisfaire simultanément les contraintes de précédence, de disponibilité après démarrage et de fin de planning.
+On propose une instance volontairement infaisable, composée d'un seul job, d'une seule opération et d'une seule machine m0. Cette opération dure 100 minutes et ne peut être exécutée que sur m0. La machine a besoin de 10 minutes pour s'allumer avant de pouvoir traiter l'opération, puis de 10 minutes supplémentaires pour s'éteindre une fois celle-ci terminée : il faut donc au minimum 10 + 100 + 10 = 120 minutes pour enchaîner allumage, traitement et extinction. Or le end_time de la machine est fixé à 90 minutes, c'est-à-dire que la machine doit être complètement éteinte avant cet instant. Même en démarrant l'allumage dès l'instant 0, il est impossible de terminer l'allumage, exécuter l'opération et éteindre la machine avant la minute 90. Cette instance ne possède donc aucune solution réalisable.
 
 ---
 
