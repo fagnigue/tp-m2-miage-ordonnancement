@@ -40,7 +40,6 @@ class Instance(object):
         '''
         inst = cls(os.path.basename(folderpath))
 
-        # --- Lecture du fichier des opérations ---
         # Format : job, operation, machine, processing_time, energy_consumption
         op_file = folderpath + os.path.sep + inst._instance_name + '_op.csv'
         with open(op_file, 'r') as csv_file:
