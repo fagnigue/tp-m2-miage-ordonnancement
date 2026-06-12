@@ -28,40 +28,34 @@ INSTANCES = ['jsp2', 'jsp10', 'jsp25']
 N_RUNS    = 10      # Nombre d'exécutions pour les méthodes stochastiques
 
 
-def _capture_metrics(sol, elapsed):
-    '''Capture les métriques d'une solution IMMÉDIATEMENT (avant tout changement d'état).'''
+def _capturer_metriques(solution, duree_execution):
     return {
-        'obj':      sol.objective,
-        'cmax':     sol.cmax,
-        'energy':   sol.total_energy_consumption,
-        'feasible': sol.is_feasible,
-        'time':     elapsed,
+        'objectif':  solution.objective,
+        'cmax':      solution.cmax,
+        'energie':   solution.total_energy_consumption,
+        'faisable':  solution.is_feasible,
+        'duree':     duree_execution,
     }
 
 
-def _run_once(heuristic, instance, **run_kwargs):
-    '''Exécute une heuristique et retourne les métriques capturées immédiatement.'''
-    t0 = time.perf_counter()
-    sol = heuristic.run(instance, **run_kwargs)
-    elapsed = time.perf_counter() - t0
-    return _capture_metrics(sol, elapsed)
+def _executer_une_fois(heuristique, instance, **kwargs_execution):
+    instant_debut = time.perf_counter()
+    solution = heuristique.run(instance, **kwargs_execution)
+    duree_execution = time.perf_counter() - instant_debut
+    return _capturer_metriques(solution, duree_execution)
 
 
-def _best_of_n(heuristic_cls, instance, n, run_kwargs):
-    '''
-    Lance n exécutions d'une heuristique et retourne les métriques
-    du meilleur run (objectif minimum), avec le temps total cumulé.
-    '''
-    best_metrics = None
-    total_time = 0.0
-    h = heuristic_cls()
-    for _ in range(n):
-        metrics = _run_once(h, instance, **run_kwargs)
-        total_time += metrics['time']
-        if best_metrics is None or metrics['obj'] < best_metrics['obj']:
-            best_metrics = metrics
-    best_metrics['time'] = total_time   # Remplacer par le temps total
-    return best_metrics
+def _meilleur_sur_n_executions(classe_heuristique, instance, nombre_executions, kwargs_execution):
+    metriques_meilleur = None
+    duree_totale = 0.0
+    heuristique = classe_heuristique()
+    for _ in range(nombre_executions):
+        metriques = _executer_une_fois(heuristique, instance, **kwargs_execution)
+        duree_totale += metriques['duree']
+        if metriques_meilleur is None or metriques['objectif'] < metriques_meilleur['objectif']:
+            metriques_meilleur = metriques
+    metriques_meilleur['duree'] = duree_totale
+    return metriques_meilleur
 
 
 def compare(instances_names=None, n_runs=N_RUNS, data_dir=DATA_DIR):
@@ -79,36 +73,36 @@ def compare(instances_names=None, n_runs=N_RUNS, data_dir=DATA_DIR):
     print(header)
     print('-' * len(header))
 
-    for inst_name in instances_names:
-        inst_path = os.path.join(data_dir, inst_name)
-        instance = Instance.from_file(inst_path)
+    for nom_instance in instances_names:
+        chemin_instance = os.path.join(data_dir, nom_instance)
+        instance = Instance.from_file(chemin_instance)
 
         # ---- 1. Greedy déterministe (1 exécution) ----
-        m_g = _run_once(Greedy(), instance)
-        _print_row(inst_name, 'Greedy', m_g)
+        metriques_greedy = _executer_une_fois(Greedy(), instance)
+        _afficher_ligne(nom_instance, 'Greedy', metriques_greedy)
 
         # ---- 2. FirstNeighborLocalSearch (N_RUNS exécutions) ----
-        m_fn = _best_of_n(
+        metriques_premier_voisin = _meilleur_sur_n_executions(
             FirstNeighborLocalSearch, instance, n_runs,
             {'NeighborClass': SwapOnMachine}
         )
-        _print_row(inst_name, f'FirstNeighbor×{n_runs}', m_fn)
+        _afficher_ligne(nom_instance, f'FirstNeighbor×{n_runs}', metriques_premier_voisin)
 
         # ---- 3. BestNeighborLocalSearch (N_RUNS exécutions) ----
-        m_bn = _best_of_n(
+        metriques_meilleur_voisin = _meilleur_sur_n_executions(
             BestNeighborLocalSearch, instance, n_runs,
             {'NeighborClasses': [SwapOnMachine, MachineReassign]}
         )
-        _print_row(inst_name, f'BestNeighbor×{n_runs}', m_bn)
+        _afficher_ligne(nom_instance, f'BestNeighbor×{n_runs}', metriques_meilleur_voisin)
 
         print()  # ligne vide entre instances
 
 
-def _print_row(inst_name, method, m):
-    feasible = 'oui' if m['feasible'] else 'non'
-    print(f"{inst_name:<12} {method:<30} {m['obj']:>10.2f} "
-          f"{m['cmax']:>7} {m['energy']:>10.2f} "
-          f"{feasible:>9} {m['time']:>10.3f}")
+def _afficher_ligne(nom_instance, methode, metriques):
+    faisable = 'oui' if metriques['faisable'] else 'non'
+    print(f"{nom_instance:<12} {methode:<30} {metriques['objectif']:>10.2f} "
+          f"{metriques['cmax']:>7} {metriques['energie']:>10.2f} "
+          f"{faisable:>9} {metriques['duree']:>10.3f}")
 
 
 if __name__ == '__main__':

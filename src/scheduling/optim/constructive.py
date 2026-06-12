@@ -110,8 +110,8 @@ class Greedy(Heuristic):
             if not candidates:
                 break  # aucune paire réalisable (ne devrait pas arriver sur instances valides)
             # Choix glouton : la paire avec le score le plus bas
-            _, best_op, best_machine = candidates[0]
-            solution.schedule(best_op, best_machine)
+            _, meilleure_operation, meilleure_machine = candidates[0]
+            solution.schedule(meilleure_operation, meilleure_machine)
 
         return solution
 
@@ -157,7 +157,7 @@ class NonDeterminist(Heuristic):
         k        = int(merged.get('k', 3))
         seed     = merged.get('seed', None)
 
-        rng = random.Random(seed)  # générateur isolé pour ne pas perturber l'état global
+        generateur_aleatoire = random.Random(seed)  # générateur isolé pour ne pas perturber l'état global
 
         solution = Solution(instance)
 
@@ -166,10 +166,10 @@ class NonDeterminist(Heuristic):
             if not candidates:
                 break
             # Liste restreinte : les k meilleures paires (ou moins s'il en reste peu)
-            rcl = candidates[:min(k, len(candidates))]
-            # Choix aléatoire dans la RCL
-            _, chosen_op, chosen_machine = rng.choice(rcl)
-            solution.schedule(chosen_op, chosen_machine)
+            liste_restreinte_candidats = candidates[:min(k, len(candidates))]
+            # Choix aléatoire dans la liste restreinte
+            _, operation_choisie, machine_choisie = generateur_aleatoire.choice(liste_restreinte_candidats)
+            solution.schedule(operation_choisie, machine_choisie)
 
         return solution
 

@@ -187,9 +187,9 @@ class SwapOnMachine(Neighborhood):
             # Ignorer les mouvements qui créent un deadlock (planning incomplet)
             if any(not op.assigned for op in self._instance.operations):
                 continue
-            n_obj = neighbor.objective
-            if n_obj < best_obj:
-                best_obj = n_obj
+            objectif_voisin = neighbor.objective
+            if objectif_voisin < best_obj:
+                best_obj = objectif_voisin
                 best_snap = {mid: list(ops) for mid, ops in new_snap.items()}
 
         # Reconstruction finale dans l'état optimal trouvé
@@ -253,10 +253,10 @@ class MachineReassign(Neighborhood):
                 for new_m_id in op.compatible_machines:
                     if new_m_id == m_id:
                         continue
-                    new_queue = snap.get(new_m_id, [])
+                    nouvelle_file = snap.get(new_m_id, [])
                     # Calculer la plage de positions valides pour l'insertion
-                    min_pos, max_pos = 0, len(new_queue)
-                    for i, existing_op in enumerate(new_queue):
+                    min_pos, max_pos = 0, len(nouvelle_file)
+                    for i, existing_op in enumerate(nouvelle_file):
                         if _is_ancestor(existing_op, op):   # existing_op précède op
                             min_pos = max(min_pos, i + 1)
                         elif _is_ancestor(op, existing_op): # op précède existing_op
@@ -276,9 +276,9 @@ class MachineReassign(Neighborhood):
         ]
         # Insérer à la position calculée sur la nouvelle machine
         new_snap.setdefault(new_m_id, [])
-        new_queue = list(new_snap[new_m_id])
-        new_queue.insert(insert_pos, op)
-        new_snap[new_m_id] = new_queue
+        nouvelle_file = list(new_snap[new_m_id])
+        nouvelle_file.insert(insert_pos, op)
+        new_snap[new_m_id] = nouvelle_file
         return new_snap
 
     def best_neighbor(self, sol: Solution) -> Solution:
@@ -297,9 +297,9 @@ class MachineReassign(Neighborhood):
             # Ignorer les mouvements qui créent un deadlock (planning incomplet)
             if any(not op.assigned for op in self._instance.operations):
                 continue
-            n_obj = neighbor.objective
-            if n_obj < best_obj:
-                best_obj = n_obj
+            objectif_voisin = neighbor.objective
+            if objectif_voisin < best_obj:
+                best_obj = objectif_voisin
                 best_snap = {mid: list(ops) for mid, ops in new_snap.items()}
 
         return _reconstruct(self._instance, best_snap)

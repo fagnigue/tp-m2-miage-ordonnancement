@@ -113,7 +113,7 @@ class BestNeighborLocalSearch(Heuristic):
         @return: Solution (optimum local ou limite d'itérations atteinte)
         '''
         merged = {**self._params, **params}
-        max_iter = int(merged.get('max_iterations', 100))
+        nb_iterations_max = int(merged.get('max_iterations', 100))
 
         if InitClass is None:
             InitClass = NonDeterminist
@@ -125,9 +125,9 @@ class BestNeighborLocalSearch(Heuristic):
 
         # Construction de la solution initiale
         current_sol = InitClass().run(instance, merged)
-        neighborhoods: List[Neighborhood] = [NC(instance, merged) for NC in NeighborClasses]
+        neighborhoods: List[Neighborhood] = [classe_voisinage(instance, merged) for classe_voisinage in NeighborClasses]
 
-        for _ in range(max_iter):
+        for _ in range(nb_iterations_max):
             # Valeur objectif courante (mise en cache avant tout changement)
             current_obj = current_sol.objective
 
@@ -140,13 +140,13 @@ class BestNeighborLocalSearch(Heuristic):
             for neighborhood in neighborhoods:
                 # Restaurer l'état courant avant d'explorer ce voisinage
                 # (chaque neighborhood.best_neighbor change l'état de l'instance)
-                _reconstruct(instance, {m_id: list(ops)
-                                        for m_id, ops in current_snap.items()})
+                _reconstruct(instance, {identifiant_machine: list(ops)
+                                        for identifiant_machine, ops in current_snap.items()})
 
                 candidate = neighborhood.best_neighbor(current_sol)
-                c_obj = candidate.objective
-                if c_obj < best_obj:
-                    best_obj = c_obj
+                objectif_candidat = candidate.objective
+                if objectif_candidat < best_obj:
+                    best_obj = objectif_candidat
                     # Capturer le snapshot du meilleur candidat
                     best_snap = _extract_orderings(instance)
 
